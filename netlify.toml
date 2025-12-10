@@ -1,10 +1,11 @@
 [build]
-  command = "npm run build"
+  command = "npm install && curl -L https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp -o /opt/build/repo/node_modules/.bin/yt-dlp && chmod a+rx /opt/build/repo/node_modules/.bin/yt-dlp && npm run build"
   publish = "dist"
   functions = "netlify/functions"
 
 [build.environment]
   NODE_VERSION = "18"
+  PYTHON_VERSION = "3.8"
 
 # Redirect API calls to Netlify Functions
 [[redirects]]
