@@ -31,41 +31,41 @@ export const mockFetchMediaInfo = async (url) => {
 
 export const mockDownloadMedia = async (media, quality) => {
     try {
+        // Get the direct download URL from our API
         const response = await axios.get(`${API_URL}/download`, {
-            params: { url: media.originalUrl, quality },
-            responseType: 'blob',
-            onDownloadProgress: (progressEvent) => {
-                // Progress handling could be passed as a callback if needed
-                // For now, MediaPreview handles its own simulated progress or we can update it to use real progress
-            }
+            params: { url: media.originalUrl, quality }
         });
 
-        // Extract filename from Content-Disposition header
-        let filename = `${media.title || 'video'}.mp4`; // Default fallback
-        const contentDisposition = response.headers['content-disposition'];
-        if (contentDisposition) {
-            const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-            if (filenameMatch && filenameMatch[1]) {
-                filename = filenameMatch[1].replace(/['"]/g, '');
-            }
+        if (response.data.success && response.data.downloadUrl) {
+            const { downloadUrl, filename } = response.data;
+
+            // Fetch the file from the direct URL
+            const fileResponse = await axios.get(downloadUrl, {
+                responseType: 'blob',
+                onDownloadProgress: (progressEvent) => {
+                    // Progress handling
+                }
+            });
+
+            // Create a link to download the blob
+            const blobUrl = window.URL.createObjectURL(new Blob([fileResponse.data]));
+            const link = document.createElement('a');
+            link.href = blobUrl;
+            link.setAttribute('download', filename);
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+
+            // Clean up the object URL
+            window.URL.revokeObjectURL(blobUrl);
+
+            return true;
+        } else {
+            throw new Error('Failed to get download URL');
         }
-
-        // Create a link to download the blob
-        const url = window.URL.createObjectURL(new Blob([response.data]));
-        const link = document.createElement('a');
-        link.href = url;
-        link.setAttribute('download', filename);
-        document.body.appendChild(link);
-        link.click();
-        link.remove();
-
-        // Clean up the object URL
-        window.URL.revokeObjectURL(url);
-
-        return true;
     } catch (error) {
         console.error("Download Error:", error);
-        throw new Error(error.response?.data?.error || 'Download failed');
+        throw new Error(error.response?.data?.error || error.message || 'Download failed');
     }
 };
 
