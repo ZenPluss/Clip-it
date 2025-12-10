@@ -1,0 +1,19 @@
+<svg width="200" height="200" viewBox="0 0 200 200" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Gradient Definition -->
+  <defs>
+    <linearGradient id="blueGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#2563eb;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#4f46e5;stop-opacity:1" />
+    </linearGradient>
+  </defs>
+  
+  <!-- Main Play Button Circle -->
+  <circle cx="100" cy="100" r="80" fill="url(#blueGradient)"/>
+  
+  <!-- Play Triangle -->
+  <path d="M 80 70 L 80 130 L 130 100 Z" fill="white"/>
+  
+  <!-- Scissors/Clip accent -->
+  <path d="M 120 60 L 140 40 M 120 60 L 130 50" stroke="white" stroke-width="6" stroke-linecap="round"/>
+  <circle cx="140" cy="40" r="8" fill="white"/>
+</svg>
