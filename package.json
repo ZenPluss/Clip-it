@@ -19,7 +19,8 @@
     "react-dom": "^18.3.1",
     "react-hot-toast": "^2.6.0",
     "react-router-dom": "^7.1.1",
-    "tailwind-merge": "^2.6.0"
+    "tailwind-merge": "^2.6.0",
+    "yt-dlp-exec": "latest"
   },
   "devDependencies": {
     "@types/react": "^18.3.18",

@@ -1,0 +1,12 @@
+# Render.yaml - Configuration for Render.com deployment
+services:
+  - type: web
+    name: clipit-backend
+    env: node
+    buildCommand: cd server && npm install
+    startCommand: cd server && npm start
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000

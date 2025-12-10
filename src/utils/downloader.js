@@ -15,7 +15,9 @@ export const validateUrl = (url) => {
     return platform !== 'Unknown' && platform !== null;
 };
 
-const API_URL = 'http://localhost:3000/api';
+// API URL - uses environment variable in production, localhost in development
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+
 
 export const mockFetchMediaInfo = async (url) => {
     try {
