@@ -1,29 +1,17 @@
-import ytDlp from 'yt-dlp-exec';
-
-// Helper to format bytes
-const formatBytes = (bytes, decimals = 2) => {
-    if (!+bytes) return 'Unknown';
-    const k = 1024;
-    const dm = decimals < 0 ? 0 : decimals;
-    const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
-};
-
 export const handler = async (event) => {
-    // Only allow GET requests
     if (event.httpMethod !== 'GET') {
         return {
             statusCode: 405,
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
             body: JSON.stringify({ error: 'Method not allowed' })
         };
     }
 
     const url = event.queryStringParameters?.url;
-
     if (!url) {
         return {
             statusCode: 400,
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
             body: JSON.stringify({ error: 'URL is required' })
         };
     }
@@ -31,37 +19,47 @@ export const handler = async (event) => {
     console.log('Fetching info for URL:', url);
 
     try {
-        const output = await ytDlp(url, {
-            dumpSingleJson: true,
-            noWarnings: true,
-            noCallHome: true,
-            noCheckCertificate: true,
-            preferFreeFormats: true,
-            youtubeSkipDashManifest: true,
-            addHeader: ['User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'],
+        // Use cobalt.tools API for video info
+        const response = await fetch('https://api.cobalt.tools/api/json', {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                url: url,
+                isAudioOnly: false,
+                isNoTTWatermark: true
+            })
         });
 
-        console.log('Successfully fetched info for:', output.title);
+        const data = await response.json();
 
-        // Determine if it's a photo or video
-        const isImage = output.ext && ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(output.ext.toLowerCase());
-        const mediaType = isImage ? 'image' : 'video';
+        if (data.status === 'error' || data.status === 'rate-limit') {
+            throw new Error(data.text || 'Failed to fetch media info');
+        }
 
-        // Try to get size
-        const sizeBytes = output.filesize || output.filesize_approx;
-        const formattedSize = sizeBytes ? formatBytes(sizeBytes) : 'Unknown';
+        // Extract platform from URL
+        let platform = 'Unknown';
+        if (url.includes('youtube.com') || url.includes('youtu.be')) platform = 'YouTube';
+        else if (url.includes('tiktok.com')) platform = 'TikTok';
+        else if (url.includes('instagram.com')) platform = 'Instagram';
+        else if (url.includes('twitter.com') || url.includes('x.com')) platform = 'Twitter';
+        else if (url.includes('facebook.com')) platform = 'Facebook';
 
+        // Format response to match our frontend expectations
         const info = {
-            id: output.id,
-            platform: output.extractor_key,
-            title: output.title || 'Untitled',
-            thumbnail: output.thumbnail || output.url,
-            duration: output.duration_string || (isImage ? 'Photo' : 'N/A'),
-            size: formattedSize,
-            quality: output.formats ? [...new Set(output.formats.map(f => f.resolution || 'original'))] : ['original'],
+            id: Date.now().toString(),
+            platform: platform,
+            title: data.filename || 'Downloaded Video',
+            thumbnail: data.thumb || '',
+            duration: 'N/A',
+            size: 'Unknown',
+            quality: ['best'],
             originalUrl: url,
-            mediaType: mediaType,
-            ext: output.ext || 'mp4'
+            mediaType: 'video',
+            ext: 'mp4',
+            downloadUrl: data.url // Store the download URL
         };
 
         return {
@@ -73,20 +71,15 @@ export const handler = async (event) => {
             },
             body: JSON.stringify(info)
         };
+
     } catch (error) {
         console.error('Error fetching info:', error.message);
-        console.error('Full error:', error);
 
-        // Provide more specific error messages
         let errorMessage = 'Failed to fetch media info';
-        if (error.message.includes('Private')) {
+        if (error.message.includes('rate-limit')) {
+            errorMessage = 'Rate limit exceeded. Please try again in a moment.';
+        } else if (error.message.includes('Private')) {
             errorMessage = 'This content is private. Please use a public post.';
-        } else if (error.message.includes('login') || error.message.includes('Sign in')) {
-            errorMessage = 'This content requires login. Try a different post or platform.';
-        } else if (error.message.includes('not available')) {
-            errorMessage = 'Content not available. The post might have been deleted.';
-        } else if (error.message.includes('Unsupported URL')) {
-            errorMessage = 'This URL is not supported. Try TikTok, YouTube, or Twitter instead.';
         }
 
         return {

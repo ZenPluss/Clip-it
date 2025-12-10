@@ -1,28 +1,17 @@
-import ytDlp from 'yt-dlp-exec';
-
 export const handler = async (event) => {
-    // Only allow GET requests
     if (event.httpMethod !== 'GET') {
         return {
             statusCode: 405,
-            headers: {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
             body: JSON.stringify({ error: 'Method not allowed' })
         };
     }
 
     const url = event.queryStringParameters?.url;
-    const quality = event.queryStringParameters?.quality;
-
     if (!url) {
         return {
             statusCode: 400,
-            headers: {
-                'Content-Type': 'application/json',
-                'Access-Control-Allow-Origin': '*'
-            },
+            headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
             body: JSON.stringify({ error: 'URL is required' })
         };
     }
@@ -30,32 +19,33 @@ export const handler = async (event) => {
     console.log('Getting download URL for:', url);
 
     try {
-        // Get direct download URL from yt-dlp
-        const info = await ytDlp(url, {
-            dumpSingleJson: true,
-            noWarnings: true,
-            noCallHome: true,
-            noCheckCertificate: true,
-            preferFreeFormats: true,
-            addHeader: ['User-Agent:Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'],
-            format: 'best[ext=mp4][protocol^=http]/best[ext=mp4]/best',
+        // Use cobalt.tools API for download
+        const response = await fetch('https://api.cobalt.tools/api/json', {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                url: url,
+                isAudioOnly: false,
+                isNoTTWatermark: true,
+                filenamePattern: 'basic'
+            })
         });
 
-        const isImage = info.ext && ['jpg', 'jpeg', 'png', 'webp', 'gif'].includes(info.ext.toLowerCase());
-        const rawFilename = `${info.title || 'download'}.${info.ext || 'mp4'}`;
-        const filename = rawFilename.replace(/[^\x20-\x7E]/g, '_');
+        const data = await response.json();
 
-        // Get the direct download URL
-        let downloadUrl = info.url;
-
-        // For formats with multiple URLs, prefer the one with best quality
-        if (info.requested_formats && info.requested_formats.length > 0) {
-            downloadUrl = info.requested_formats[0].url;
+        if (data.status === 'error' || data.status === 'rate-limit') {
+            throw new Error(data.text || 'Failed to get download URL');
         }
 
-        console.log('Direct download URL obtained for:', filename);
+        // cobalt.tools returns direct download URL
+        const downloadUrl = data.url;
+        const filename = data.filename || 'video.mp4';
 
-        // Return the direct download URL to the client
+        console.log('Direct download URL obtained');
+
         return {
             statusCode: 200,
             headers: {
@@ -67,13 +57,19 @@ export const handler = async (event) => {
                 success: true,
                 downloadUrl: downloadUrl,
                 filename: filename,
-                title: info.title,
-                ext: info.ext
+                title: filename.replace(/\.[^/.]+$/, ''), // Remove extension
+                ext: filename.split('.').pop() || 'mp4'
             })
         };
 
     } catch (error) {
         console.error('Download error:', error.message);
+
+        let errorMessage = 'Failed to get download URL';
+        if (error.message.includes('rate-limit')) {
+            errorMessage = 'Rate limit exceeded. Please try again in a moment.';
+        }
+
         return {
             statusCode: 500,
             headers: {
@@ -82,7 +78,7 @@ export const handler = async (event) => {
                 'Access-Control-Allow-Headers': 'Content-Type'
             },
             body: JSON.stringify({
-                error: 'Failed to get download URL',
+                error: errorMessage,
                 details: error.message
             })
         };
