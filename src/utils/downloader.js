@@ -40,18 +40,32 @@ export const mockDownloadMedia = async (media, quality) => {
             }
         });
 
+        // Extract filename from Content-Disposition header
+        let filename = `${media.title || 'video'}.mp4`; // Default fallback
+        const contentDisposition = response.headers['content-disposition'];
+        if (contentDisposition) {
+            const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+            if (filenameMatch && filenameMatch[1]) {
+                filename = filenameMatch[1].replace(/['"]/g, '');
+            }
+        }
+
         // Create a link to download the blob
         const url = window.URL.createObjectURL(new Blob([response.data]));
         const link = document.createElement('a');
         link.href = url;
-        link.setAttribute('download', `${media.title || 'video'}.mp4`);
+        link.setAttribute('download', filename);
         document.body.appendChild(link);
         link.click();
         link.remove();
+
+        // Clean up the object URL
+        window.URL.revokeObjectURL(url);
+
         return true;
     } catch (error) {
         console.error("Download Error:", error);
-        throw new Error('Download failed');
+        throw new Error(error.response?.data?.error || 'Download failed');
     }
 };
 
